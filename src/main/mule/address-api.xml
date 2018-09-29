@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd">
+    <http:listener-config name="address-api-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="${https:port}" protocol="HTTPS">
+			<tls:context >
+				<tls:key-store type="jks" path="${keystore.path}" keyPassword="${keystore.password}" password="${keystore.password}" />
+			</tls:context>
+		</http:listener-connection>
+    </http:listener-config>
+    <apikit:config name="address-api-config" raml="address-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <flow name="address-api-main">
+        <http:listener config-ref="address-api-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="address-api-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND, APP:NOT_FOUND" enableNotifications="true" logException="true">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="address-api-console">
+        <http:listener config-ref="address-api-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="address-api-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="put:\addresses\(id):application\json:address-api-config">
+        <set-variable value="#[attributes.uriParams.id]" doc:name="Save ID" doc:id="27d50035-0454-4426-8feb-6f89eef93c15" variableName="id"/>
+		<flow-ref doc:name="Flow Reference" doc:id="7700f390-0cf9-49ff-8f42-544592adc556" name="getAddressById" target="addressID" targetValue="#[payload.Id]"/>
+        <ee:transform doc:name="Transform Message" doc:id="9d0eddf2-4b2d-4c97-aced-f27e1e91ae50" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+Id: vars.id,
+Street__c: payload.addressLines default [] joinBy(","),
+City__c: payload.city,
+Postal_Code__c: payload.postalCode,
+State__c: payload.state,
+Country__c: payload.countryName,
+Address_Type__c: payload.'type' 
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:update-single type="NTOAddress__c" doc:name="Update single" doc:id="b27e3d0c-e799-418e-a1e7-74209b640ee3" config-ref="Salesforce_Config">
+			<salesforce:record ><![CDATA[#[%dw 2.0
+output application/java
+---
+  {
+    Id: vars.id,
+    Street__c: payload.addressLines default [] joinBy(","),
+    City__c: payload.city,
+    Postal_Code__c: payload.postalCode,
+    State__c: payload.state,
+    Country__c: payload.countryName,
+    Address_Type__c: payload.'type' 
+  }
+]]]></salesforce:record>
+		</salesforce:update-single>
+    </flow>
+    <flow name="delete:\addresses\(id):address-api-config">
+		<set-variable value="#[attributes.uriParams.id]" doc:name="Save ID" doc:id="d03fed02-4e60-4a39-a80a-061d198f7839" variableName="id"/>
+		<flow-ref doc:name="Flow Reference" doc:id="6e4b94c8-7786-4c3a-8c72-8aa6aacb377e" name="getAddressById"/>
+        <salesforce:delete doc:name="Delete" doc:id="d72b314e-e777-43bb-8926-0949957e696c" config-ref="Salesforce_Config">
+			<salesforce:delete-ids ><![CDATA[#[[payload.Id]]]]></salesforce:delete-ids>
+		</salesforce:delete>
+    </flow>
+    <flow name="get:\addresses:address-api-config">
+        <ee:transform doc:name="Save Pagination Params" doc:id="5ee560f1-a8d7-4b6d-8f54-628a586d16bd" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="pagination" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	limit: attributes.queryParams.maxResults default 10,
+	offset: attributes.queryParams.pagingOffset default 0
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="e028dd1d-e85e-44e7-9760-d844547fa116" >
+			<route >
+				<salesforce:query doc:name="Get Addresses" doc:id="7193749a-04ad-40ed-bdbc-59a46fbc37cf" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query>SELECT Name, Street__c, State__c, Postal_Code__c,City__c,Country__c, Address_Type__c
+FROM 	NTOAddress__c
+WHERE Account__c = :customerId
+LIMIT :limit
+OFFSET :offset</salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"customerId" : attributes.queryParams.customerId,
+	"limit" : vars.pagination.limit,
+	"offset" : vars.pagination.offset
+}]]]></salesforce:parameters>
+		</salesforce:query>
+			</route>
+			<route >
+				<salesforce:query doc:name="Count" doc:id="3d503475-3732-4699-9dd6-f34730607095" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query >SELECT count(Name)
+FROM 	NTOAddress__c
+WHERE Account__c = :customerId</salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"customerId" : attributes.queryParams.customerId
+}]]]></salesforce:parameters>
+				</salesforce:query>
+			</route>
+		</scatter-gather>
+		<ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" doc:id="6939caab-827b-4b8f-890e-e59ba743060a">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var addresses=payload[0].payload
+---
+{
+  meta: {
+    messages: [
+      {
+        severity: "INFO",
+        code: "200",
+        description: "OK",
+      }
+    ],
+    totalItems: payload[1].payload[0],
+    pagingOffset: vars.pagination.offset,
+    pagingLimit: vars.pagination.limit
+  },
+  addresses: addresses map (address, index) -> {
+  	addressLines: [
+  		address.Street__c
+  	],
+  	city: address.City__c,
+  	postalCode: address.Postal_Code__c,
+  	state: address.State__c,
+  	countryName: address.Country__c,
+  	'type': address.Address_Type__c,
+  	addressId: address.Name
+  }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="get:\addresses\(id):address-api-config">
+        <set-variable value="#[attributes.uriParams.id]" doc:name="Save ID" doc:id="1ee3c67c-8d26-491d-bb36-8a937c45fa4c" variableName="id" />
+		<flow-ref doc:name="Flow Reference" doc:id="afb8b409-781a-44c0-951d-952fa5e1b797" name="getAddressById"/>
+		<ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" doc:id="4f5108bf-cebc-4ea3-b546-c1ad90a993cf">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	city: payload.City__c,
+	postalCode: payload.Postal_Code__c,
+	addressLines: payload.Street__c,
+	state: payload.State__c,
+	countryName: payload.Country__c,
+	"type": payload.Address_Type__c,
+	addressId: payload.Name, 
+	customerId: payload.Account__c
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    <flow name="post:\addresses:application\json:address-api-config">
+		<salesforce:create-multiple type="NTOAddress__c" doc:name="Create multiple" doc:id="1607c8c1-8dac-4845-8ab9-4776262fec2d" config-ref="Salesforce_Config">
+			<salesforce:records ><![CDATA[#[%dw 2.0
+output application/java
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	Street__c: payload01.addressLines default [] joinBy(","),
+	City__c: payload01.city,
+	State__c: payload01.state,
+	Postal_Code__c: payload01.postalCode,
+	Country__c: payload01.countryName,
+	Account__c: payload01.customerId,
+	Address_Type__c: payload01."type"
+}
+
+
+]]]></salesforce:records>
+		</salesforce:create-multiple>
+		<ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" doc:id="139d2ca1-5ef8-4f08-bbe6-b718710784f6">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	meta: {
+		totalItems: sizeOf(payload.items.id)
+	},
+	messages: payload.items map ( result, indexOf )  -> {
+	  severity: if(result.payload.success == true) "OK" else "ERROR",
+	  code: if(result.payload.success == true) "201" else "500",
+	  description: result.payload.errors.message default [] joinBy(","),
+	  itemId: result.id
+	}
+
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+	<flow name="getAddressById" doc:id="a6a9ed40-f428-42e0-a61b-99d3a6028445" >
+		<salesforce:query-single doc:name="Query single" doc:id="72cac904-d691-426e-8d3b-016fba288cc5" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query>SELECT Id, Name, Street__c, State__c, Postal_Code__c,City__c,Country__c, Address_Type__c, Account__c
+FROM 	NTOAddress__c
+WHERE Name=:id</salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"id" : vars.id
+}]]]></salesforce:parameters>
+		</salesforce:query-single>
+		<validation:is-false doc:name="Is false" doc:id="eb71279d-6c70-47c7-8ca7-5a281a3ed462" expression="#[payload == null]">
+			<error-mapping sourceType="VALIDATION:INVALID_BOOLEAN" targetType="APP:NOT_FOUND" />
+		</validation:is-false>
+	</flow>
+</mule>
